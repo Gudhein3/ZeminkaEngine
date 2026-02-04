@@ -52,6 +52,7 @@ static double getDeltaTime() {
 f64 ZEdeltaTime = 0, ZEdeltaTime30Hz = 0, ZEsystemTime = 0;
 
 static ZESndSound *shoot_sound;
+static ZESndSound *music_sound;
 
 typedef struct {
     ZEVec2 pos, vel;
@@ -244,7 +245,7 @@ f64 ZEmousedX = 0, ZEmousedY = 0;
 static FILE *_logf;
 
 int main() {
-    ZEScreen_init(1280, 720, 120., "Zeminka engine v" ZEMINKAENG_VER " test code");
+    ZEScreen_init(1920, 1080, 120., "Zeminka engine v" ZEMINKAENG_VER " test code");
 
     _logf = fopen("zeminkaengine.log", "wb");
     if (!_logf)
@@ -254,10 +255,15 @@ int main() {
 
     ZESndInit();
     
-    ZELog(ZELOG_INFO, "Successfully initialized sound engine.");
-
+    ZELog(ZELOG_INFO, "Successfully initialized the sound engine.");
+    
+    ZEScreen_BeginFrame(&ZEmousedX, &ZEmousedY);
+    
     shoot_sound = ZESndLoad("./assets/shoot.mp3");
-
+    
+    // music_sound = ZESndLoad("./assets/music.mp3"); // My song sounds very very bad.
+    // ZESndSetLooping(music_sound, true);
+    
     ZEVec3 pos = ZEVec3_From3(0, 0, 1.);
     
     ZEEnt_add(bball_intf);
@@ -267,6 +273,9 @@ int main() {
     f64 c_yaw = 0;
     f64 c_pitch = 0;
     ZEVec3 c_pos = {0};
+
+    // ZESndSetVolume(music_sound, .1);
+    // ZESndPlay(music_sound);
     
     while (ZEScreen_IsNtClosed()) {
         ZEdeltaTime = getDeltaTime();

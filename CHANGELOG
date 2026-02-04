@@ -11,3 +11,7 @@
  Add ZESnd module
  Add ZEGeom module
  Slightly change some basic modules
+
+0.2.1:
+ Fix sound module
+ Add GNU/Make building system support

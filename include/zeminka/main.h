@@ -15,7 +15,7 @@
 // Patch - when neither backward compatibility nor forward compatibility is broken
 
 #define ZEMINKAENG_VER_MAJOR 0
-#define ZEMINKAENG_VER_MINOR 2
+#define ZEMINKAENG_VER_MINOR 3
 #define ZEMINKAENG_VER_PATCH 0
 #define ZEMINKAENG_VER __STR(ZEMINKAENG_VER_MAJOR)"."__STR(ZEMINKAENG_VER_MINOR)"."__STR(ZEMINKAENG_VER_PATCH)
 

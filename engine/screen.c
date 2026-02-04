@@ -1,7 +1,7 @@
 #include <zeminka/engine.h>
 
-#define RGFW_IMPLEMENTATION
 #define RGFW_OPENGL
+#define RGFWDEF extern
 #include "../thirdparty/RGFW.h"
 
 #include <GL/gl.h>
@@ -49,7 +49,7 @@ void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title) {
     rheight = height;
     // TODO: unhardcode it.
     bool is_fullscreen = (width == 1920) && (height == 1080); // My laptop has screen 1920x1080.
-    rwin = RGFW_createWindow(title, 0, 0, width, height, (is_fullscreen ? RGFW_windowFullscreen | RGFW_windowOpenGL : RGFW_windowCenter) | RGFW_windowOpenGL);
+    rwin = RGFW_createWindow(title, 0, 0, width, height, (is_fullscreen ? RGFW_windowFullscreen : RGFW_windowCenter) | RGFW_windowOpenGL);
     RGFW_window_setIcon(rwin, icon, 16, 16, RGFW_formatBGR8);
     RGFW_window_makeCurrentContext_OpenGL(rwin);
 

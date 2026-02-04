@@ -18,3 +18,5 @@ void ZESndSetVolume(ZESndSound *snd, f64 vol);
 void ZESndSetPos(ZESndSound *snd, ZEVec3 pos);
 void ZESndSetDir(ZESndSound *snd, ZEVec3 dir);
 void ZESndSetVel(ZESndSound *snd, ZEVec3 vel);
+void ZESndSetLooping(ZESndSound *snd, bool looping);
+bool ZESndIsPlaying(ZESndSound *snd);

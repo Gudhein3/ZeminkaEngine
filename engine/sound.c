@@ -1,5 +1,4 @@
 #include <zeminka/sound.h>
-#define MA_IMPLEMENTATION
 #include "../thirdparty/miniaudio.h"
 #include <stdio.h>
 
@@ -45,4 +44,12 @@ void ZESndSetDir(ZESndSound *snd, ZEVec3 dir) {
 
 void ZESndSetVel(ZESndSound *snd, ZEVec3 vel) {
     ma_sound_set_velocity(&snd->ms, vel.x, vel.y, vel.z);
+}
+
+void ZESndSetLooping(ZESndSound *snd, bool looping) {
+    ma_sound_set_looping(&snd->ms, looping);
+}
+
+bool ZESndIsPlaying(ZESndSound *snd) {
+    return ma_sound_is_playing(&snd->ms);
 }
