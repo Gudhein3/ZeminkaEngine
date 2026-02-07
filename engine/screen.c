@@ -43,16 +43,37 @@ static u8 icon[16 * 16 * 3 + 1] = // Silly Placeholder
     "\377\000\000\377\000\000\060\377\000\060\377\000\060\377\000\060\377\000\060\377\000\060\377\000\060"
     "\377\000";
 
-void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title) {
+static void _onresize(i32 w, i32 h) {
+    if (w == 0 && h == 0) RGFW_window_getSize(rwin, &w, &h);
+    
+    rwidth = w;
+    rheight = h;
+    
+    glViewport(0, 0, rwidth, rheight);
+}
+
+static void _resize_callback(RGFW_window* win, i32 w, i32 h) {_onresize(w, h);}
+
+void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title, u32 flags) {
+    RGFW_setWindowResizedCallback(_resize_callback);
     rfov = fov;
     rwidth = width;
     rheight = height;
-    // TODO: unhardcode it.
-    bool is_fullscreen = (width == 1920) && (height == 1080); // My laptop has screen 1920x1080.
-    rwin = RGFW_createWindow(title, 0, 0, width, height, (is_fullscreen ? RGFW_windowFullscreen : RGFW_windowCenter) | RGFW_windowOpenGL);
+    u32 rgfw_flags = RGFW_windowOpenGL;
+    if (flags | ZEScreenFlag_Fullscreen) {
+        if (flags | ZEScreenFlag_Borderless) rgfw_flags |= RGFW_windowMaximized;
+        else rgfw_flags |= RGFW_windowFullscreen;
+    }
+    else rgfw_flags |= RGFW_windowCenter;
+    if (!(flags | ZEScreenFlag_Resizeable)) rgfw_flags |= RGFW_windowNoResize;
+    if (flags | ZEScreenFlag_Borderless) rgfw_flags |= RGFW_windowNoBorder;
+    rwin = RGFW_createWindow(title, 0, 0, width, height, rgfw_flags);
     RGFW_window_setIcon(rwin, icon, 16, 16, RGFW_formatBGR8);
-    RGFW_window_makeCurrentContext_OpenGL(rwin);
 
+    _onresize(0, 0);
+    
+    RGFW_window_makeCurrentContext_OpenGL(rwin);
+    
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 }
@@ -85,6 +106,27 @@ void ZEScreen_BeginFrame(f64 *omx, f64 *omy) {
     glClearColor(0.f, 1.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    ZEScreen_ResetCamera();
+
+    // It doesn't work on MS Windows.
+    if (omx) *omx = 0;
+    if (omy) *omy = 0;
+    // i32 mx_ = 0, my_ = 0;
+    // RGFW_window_getMouse(rwin, &mx_, &my_);
+    // {
+    //     f32 mx = mx_;
+    //     f32 my = my_;
+    //     mx -= rwidth*.5;
+    //     my -= rheight*.5;
+    //     mx /= rwidth*.5;
+    //     my /= rheight*.5;
+    //     if (omx) *omx = mx;
+    //     if (omy) *omy = my;
+    //     RGFW_window_moveMouse(rwin, rwin->x+rwidth*.5, rwin->y+rheight*.5);
+    // }
+}
+
+void ZEScreen_ResetCamera() {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     f64 aspect = ((f64)rwidth)/((f64)rheight);
@@ -114,23 +156,6 @@ void ZEScreen_BeginFrame(f64 *omx, f64 *omy) {
     
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-
-    // It doesn't work on MS Windows.
-    if (omx) *omx = 0;
-    if (omy) *omy = 0;
-    // i32 mx_ = 0, my_ = 0;
-    // RGFW_window_getMouse(rwin, &mx_, &my_);
-    // {
-    //     f32 mx = mx_;
-    //     f32 my = my_;
-    //     mx -= rwidth*.5;
-    //     my -= rheight*.5;
-    //     mx /= rwidth*.5;
-    //     my /= rheight*.5;
-    //     if (omx) *omx = mx;
-    //     if (omy) *omy = my;
-    //     RGFW_window_moveMouse(rwin, rwin->x+rwidth*.5, rwin->y+rheight*.5);
-    // }
 }
 
 void ZEScreen_TranslateCamera(ZEVec3 origin) {
@@ -173,7 +198,7 @@ void ZEScreen_DrawCircle(ZEVec3 o, f64 r, ZEColor col) {
     glEnd();
 }
 
-void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
+void ZEScreen_DrawTriangleRaw(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
     glBegin(GL_TRIANGLES);
     glColor4d(col.r, col.g, col.b, col.a);
     glVertex3d(a.x, a.y, a.z);
@@ -182,13 +207,37 @@ void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
     glEnd();
 }
 
-void ZEScreen_DrawTriangle_Ex(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor a_c, ZEColor b_c, ZEColor c_c) {
+static f64 get_light(ZEVec3 a, ZEVec3 b, ZEVec3 c) {
+    ZEVec3 aq = ZEVec3_Sub(b, a);
+    ZEVec3 bq = ZEVec3_Sub(c, a);
+    ZEVec3 n = ZEVec3_Norm(ZEVec3_From3(aq.y*bq.z-aq.z*bq.y, aq.z*bq.x-aq.x*bq.z, aq.x*bq.y-aq.y*bq.x));
+    ZEVec3 sun = ZEVec3_From3(cos(ZEsystemTime)*10., 1, sin(ZEsystemTime)*10.);
+    sun = ZEVec3_Norm(sun);
+    f64 d = DOT3(n.x, n.y, n.z, sun.x, sun.y, sun.z);
+    if (d < 0) d = 0;
+    d += .3f;
+    if (d > 1) d = 1;
+    return d;
+}
+
+void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
+    f64 d = get_light(a, b, c);
     glBegin(GL_TRIANGLES);
-    glColor4d(a_c.r, a_c.g, a_c.b, a_c.a);
+    glColor4d(col.r*d, col.g*d, col.b*d, col.a);
     glVertex3d(a.x, a.y, a.z);
-    glColor4d(b_c.r, b_c.g, b_c.b, b_c.a);
     glVertex3d(b.x, b.y, b.z);
-    glColor4d(c_c.r, c_c.g, c_c.b, c_c.a);
+    glVertex3d(c.x, c.y, c.z);
+    glEnd();
+}
+
+void ZEScreen_DrawTriangle_Ex(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor a_c, ZEColor b_c, ZEColor c_c) {
+    f64 d = get_light(a, b, c);
+    glBegin(GL_TRIANGLES);
+    glColor4d(a_c.r*d, a_c.g*d, a_c.b*d, a_c.a);
+    glVertex3d(a.x, a.y, a.z);
+    glColor4d(b_c.r*d, b_c.g*d, b_c.b*d, b_c.a);
+    glVertex3d(b.x, b.y, b.z);
+    glColor4d(c_c.r*d, c_c.g*d, c_c.b*d, c_c.a);
     glVertex3d(c.x, c.y, c.z);
     glEnd();
 }

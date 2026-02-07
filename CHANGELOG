@@ -15,3 +15,12 @@
 0.2.1:
  Fix sound module
  Add GNU/Make building system support
+
+1.0.0:
+ Separate engine and game stuff
+ Add simple lightning model
+ Make a simple showcase game
+ Fix build.sh & build.win.sh
+ Add ZEScreen_ResetCamera
+ Add flags to window initialization
+ Fix rendering context resizing

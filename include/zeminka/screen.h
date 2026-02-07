@@ -129,20 +129,29 @@ typedef enum {
     ZEKEY_keyLast = 256
 } ZEKey; // Sorry, RGFW authors.
 
+enum {
+    ZEScreenFlag_Nothing    = 0,
+    ZEScreenFlag_Resizeable = 1<<0,
+    ZEScreenFlag_Borderless = 1<<1,
+    ZEScreenFlag_Fullscreen = 1<<2,
+};
+
 #define DEG2RAD (PI/180)
 #define RAD2DEG (180/PI)
 
-void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title);
+void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title, u32 flags);
 
 bool ZEScreen_IsClosed();
 bool ZEScreen_IsNtClosed(); // Finally isn't closed function!
 
 void ZEScreen_BeginFrame(f64 *_Nullable mdx, f64 *_Nullable mdy); // mouse delta, not an absolute position.
+void ZEScreen_ResetCamera();
 void ZEScreen_TranslateCamera(ZEVec3 origin);
 void ZEScreen_RotateCamera(f64 yaw, f64 pitch, f64 roll); // YZ,XZ,XY
 void ZEScreen_EndFrame();
 
 void ZEScreen_DrawCircle(ZEVec3 o, f64 r, ZEColor col);
+void ZEScreen_DrawTriangleRaw(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col);
 void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col);
 void ZEScreen_DrawTriangle_Ex(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor a_c, ZEColor b_c, ZEColor c_c);
 
@@ -167,6 +176,7 @@ void *ZEScreen_GetSystemHandler();
 #define ZEWHITE ((ZEColor){1.,1.,1.,1.})
 #define ZEGRAY ((ZEColor){.5,.5,.5,1.})
 #define ZEORANGE ((ZEColor){1.,.5,0,1.})
+#define ZEBEIGE ((ZEColor){.960, .960, .862})
 
 // Small hack for the MSVC compiler.
 #define ZERED_ {1.,0,0,1.}
@@ -179,4 +189,5 @@ void *ZEScreen_GetSystemHandler();
 #define ZEWHITE_ {1.,1.,1.,1.}
 #define ZEGRAY_ {.5,.5,.5,1.}
 #define ZEORANGE_ {1.,.5,0,1.}
- 
+#define ZEBEIGE_ {.960, .960, .862}
+

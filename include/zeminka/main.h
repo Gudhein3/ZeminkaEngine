@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 #ifndef __STR
 #define __STR0(x) #x
@@ -14,8 +15,8 @@
 // Minor - when forward compatibility is broken
 // Patch - when neither backward compatibility nor forward compatibility is broken
 
-#define ZEMINKAENG_VER_MAJOR 0
-#define ZEMINKAENG_VER_MINOR 3
+#define ZEMINKAENG_VER_MAJOR 1
+#define ZEMINKAENG_VER_MINOR 0
 #define ZEMINKAENG_VER_PATCH 0
 #define ZEMINKAENG_VER __STR(ZEMINKAENG_VER_MAJOR)"."__STR(ZEMINKAENG_VER_MINOR)"."__STR(ZEMINKAENG_VER_PATCH)
 
@@ -43,6 +44,12 @@ extern f64 ZEdeltaTime, ZEdeltaTime30Hz, ZEsystemTime;
 
 #define PI (3.14159265358979323)
 #define TAU (6.28318530717958646)
+
+#define SQRT_1_3 0.5773502691896258
+#define SQRT_1_2 0.7071067811865475
+
+#define SQRT_3 1.7320508075688772
+#define SQRT_2 1.4142135623730951
 
 // I spent 30 minutes to find this value. Never ask me for Math.
 #define GRAV (4./3.)
