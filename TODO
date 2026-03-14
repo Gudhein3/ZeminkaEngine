@@ -1,2 +1,13 @@
 Add MacOS support.
-Learn physics. I currently use my silly Mathematical logic instead of True Physical one.
+Fix `build.bat'.
+Add dynamically loadable shaders.
+Add multithreading.
+Add collision resolver to the physics engine.
+Add textures/materials system.
+Add raycasting.
+Add plugins support.
+Add config system.
+Add console system.
+Add orthographic projection support.
+Improve the camera system.
+Make the executables reproducible. [https://reproducible-builds.org/docs/randomness/] -frandom-seed
