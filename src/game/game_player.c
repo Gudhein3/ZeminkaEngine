@@ -20,17 +20,17 @@ void player_onmsg(void *_ent, ZEEnt_ent ent_id, ZEEnt_ent caller, ZEEnt_Msg_Kind
     Player_Data *ent = _ent;
     switch (msg_kind) {
     case ZEENT_MSG_UPDATE: {
-        if (ZEScreen_IsKeyDown(ZEKEY_up)) {
+        if (ZEScreen_IsKeyDown(ZEKEY_Up)) {
             ent->c_pitch += cos(ent->c_roll)*ZEdeltaTime;
             ent->c_yaw -= sin(ent->c_roll)*cos(-ent->c_pitch)*ZEdeltaTime;
         }
-        if (ZEScreen_IsKeyDown(ZEKEY_down)) {
+        if (ZEScreen_IsKeyDown(ZEKEY_Down)) {
             ent->c_pitch -= cos(ent->c_roll)*ZEdeltaTime;
             ent->c_yaw += sin(ent->c_roll)*cos(-ent->c_pitch)*ZEdeltaTime;
         }
-        if (ZEScreen_IsKeyDown(ZEKEY_left)) ent->c_roll += ZEdeltaTime;
-        if (ZEScreen_IsKeyDown(ZEKEY_right)) ent->c_roll -= ZEdeltaTime;
-        
+        if (ZEScreen_IsKeyDown(ZEKEY_Left)) ent->c_roll += ZEdeltaTime;
+        if (ZEScreen_IsKeyDown(ZEKEY_Right)) ent->c_roll -= ZEdeltaTime;
+
         ZEVec3 vel = ZEVec3_From3(0, 0, 5);
         vel = ZEVec3_Scale(vel, ZEdeltaTime);
         ZETransformW tw = ZETransform_Cache((ZETransform) {{0}, {-ent->c_pitch, ent->c_yaw, 0}, {1,1,1}});
@@ -50,7 +50,7 @@ void player_onmsg(void *_ent, ZEEnt_ent ent_id, ZEEnt_ent caller, ZEEnt_Msg_Kind
         j += TERMAP-(j%(TERMAP));
         j /= TERMAP;
         j += TERSIZ/2;
-        
+
         f64 x = ((f64)i)-TERSIZ/2;
         f64 y = ((f64)j)-TERSIZ/2;
         const ZEColor c = ZEBLUE;

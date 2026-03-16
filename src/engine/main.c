@@ -105,7 +105,7 @@ void Game_update();
 void Game_post_update();
 
 int main(int argc, char **argv) {
-    ZEScreen_init(640, 480, 120., "Flight simulator", ZEScreenFlag_Fullscreen | ZEScreenFlag_Borderless);
+    ZEScreen_init(640, 480, 120., "Flight simulator", ZEScreenFlag_Resizeable);
 
     _logf = fopen("zeminkaengine.log", "wb");
     if (!_logf)
@@ -118,14 +118,14 @@ int main(int argc, char **argv) {
     ZELog(ZELOG_INFO, "Successfully initialized the sound engine.");
 
     ZEScreen_BeginFrame(&ZEmousedX, &ZEmousedY);
-    
+
     getDeltaTime(); // Refresh delta time.
 
     {
         int code = Game_init(argc, argv);
         if (code != 0) return code;
     }
-    
+
     while (ZEScreen_IsNtClosed()) {
         ZEdeltaTime = getDeltaTime();
         ZEsystemTime = getSystemTime();
