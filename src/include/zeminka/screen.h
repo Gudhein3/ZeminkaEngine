@@ -129,6 +129,12 @@ typedef enum {
     ZEKEY_Last         = ZEKEY_World2
 } ZEKey;
 
+typedef struct {
+    u64 vert;
+    u64 frag;
+    u64 prog;
+} ZEShaderProg;
+
 enum {
     ZEScreenFlag_Nothing    = 0,
     ZEScreenFlag_Resizeable = 1<<0,
@@ -142,6 +148,14 @@ enum {
 #ifndef _ZE_NO_SYMBOLS
 void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title, u32 flags);
 
+u64 ZEScreen_CompileShader(ZEShaderProg *prog, const char *vert, const char *frag);
+
+void ZEScreen_DrawShaderTriangle(ZEShaderProg *prog, ZEVec2 a, ZEVec2 b, ZEVec2 c);
+void ZEScreen_Shader_SetUniformf(ZEShaderProg *prog, const char *name, f64 param);
+void ZEScreen_Shader_SetUniformi(ZEShaderProg *prog, const char *name, int param);
+void ZEScreen_Shader_SetUniformf2(ZEShaderProg *prog, const char *name, ZEVec2 param);
+void ZEScreen_Shader_SetUniformf3(ZEShaderProg *prog, const char *name, ZEVec3 param);
+void ZEScreen_Shader_SetUniformf4(ZEShaderProg *prog, const char *name, ZEVec4 param);
 bool ZEScreen_IsClosed();
 bool ZEScreen_IsNtClosed(); // Finally isn't closed function!
 
@@ -167,6 +181,8 @@ void ZEScreen_RenderModel(ZEModel model, ZETransformW transform);
 
 void *ZEScreen_GetSystemHandler();
 #endif  // _ZE_NO_SYMBOLS
+
+extern f64 ZEmousedX, ZEmousedY;
 
 #define ZERED ((ZEColor){1.,0,0,1.})
 #define ZEMAGENTA ((ZEColor){1.,0,1.,1.})

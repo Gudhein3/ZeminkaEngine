@@ -1,8 +1,13 @@
+// TODO: Move multi-threading logic to a separated module.
+#include <pthread.h>
+#include <errno.h>
+#include <unistd.h>
+
 #include <zeminka/engine.h>
 #include <stdio.h>
 
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <GL/gl.h>
 
 static GLFWwindow *rwin;
 
@@ -183,6 +188,136 @@ static u8 icon[16 * 16 * 3 + 1] = // Silly Placeholder
     "\377\000\000\377\000\000\060\377\000\060\377\000\060\377\000\060\377\000\060\377\000\060\377\000\060"
     "\377\000";
 
+// https://www.khronos.org/assets/uploads/books/openglr_es_20_programming_guide_sample.pdf
+static GLuint LoadShader(GLenum type, const char *shaderSrc) {
+    GLuint shader;
+    GLint compiled;
+    shader = glCreateShader(type);
+    if(shader == 0)
+        return 0;
+    glShaderSource(shader, 1, &shaderSrc, NULL);
+    glCompileShader(shader);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+
+    if(!compiled) {
+        GLint infoLen = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
+        if(infoLen > 1) {
+            char* infoLog = malloc(sizeof(char) * infoLen);
+            glGetShaderInfoLog(shader, infoLen, NULL, infoLog);
+            ZELog(ZELOG_WARNING, "OpenGL: Error compiling shader:\n%s\n%s\n", infoLog, shaderSrc);
+            free(infoLog);
+        }
+        glDeleteShader(shader);
+        return 0;
+    }
+    return shader;
+}
+
+// https://www.khronos.org/assets/uploads/books/openglr_es_20_programming_guide_sample.pdf
+u64 ZEScreen_CompileShader(ZEShaderProg *prog, const char *vert, const char *frag) {
+    prog->vert = LoadShader(GL_VERTEX_SHADER, vert);
+    prog->frag = LoadShader(GL_FRAGMENT_SHADER, frag);
+    prog->prog = glCreateProgram();
+    if (prog->prog == 0) return 0;
+    glAttachShader(prog->prog, prog->vert);
+    glAttachShader(prog->prog, prog->frag);
+    glBindAttribLocation(prog->prog, 0, "vPosition");
+    glLinkProgram(prog->prog);
+    int linked;
+    glGetProgramiv(prog->prog, GL_LINK_STATUS, &linked);
+    if(!linked)
+    {
+        GLint infoLen = 0;
+        glGetProgramiv(prog->prog, GL_INFO_LOG_LENGTH, &infoLen);
+        if(infoLen > 1) {
+            char* infoLog = malloc(sizeof(char) * infoLen);
+            glGetProgramInfoLog(prog->prog, infoLen, NULL, infoLog);
+            ZELog(ZELOG_WARNING, "OpenGL: Error linking program:\n%s\n", infoLog);
+            free(infoLog);
+        }
+        glDeleteProgram(prog->prog);
+        return 0;
+    }
+    return prog->prog;
+}
+
+static GLuint rrendtex = -1;
+static GLuint rrenddtex = -1;
+static GLuint rrendfbo = -1;
+
+void ZEScreen_DrawShaderTriangle(ZEShaderProg *prog, ZEVec2 a, ZEVec2 b, ZEVec2 c) {
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glUseProgram(prog->prog);
+    GLfloat verts[] = {
+        a.x,a.y,
+        b.x,b.y,
+        c.x,c.y
+    };
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    GLint uSysTime = glGetUniformLocation(prog->prog, "uSysTime");
+    glUniform1f(uSysTime, ZEsystemTime);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rrendtex);
+    GLint uTex0 = glGetUniformLocation(prog->prog, "screen");
+    glUniform1i(uTex0, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, rrenddtex);
+    GLint uTex1 = glGetUniformLocation(prog->prog, "screen_depth");
+    glUniform1i(uTex1, 1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+    GLint locPos = glGetAttribLocation(prog->prog, "vPosition");
+    glEnableVertexAttribArray(locPos);
+    glVertexAttribPointer(locPos, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);
+
+    glDisableVertexAttribArray(locPos);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDeleteBuffers(1, &vbo);
+    glUseProgram(0);
+}
+
+void ZEScreen_Shader_SetUniformf(ZEShaderProg *prog, const char *name, f64 param) {
+    glUseProgram(prog->prog);
+    GLint uSysTime = glGetUniformLocation(prog->prog, name);
+    glUniform1f(uSysTime, param);
+    glUseProgram(0);
+}
+
+void ZEScreen_Shader_SetUniformi(ZEShaderProg *prog, const char *name, int param) {
+    glUseProgram(prog->prog);
+    GLint uSysTime = glGetUniformLocation(prog->prog, name);
+    glUniform1i(uSysTime, param);
+    glUseProgram(0);
+}
+
+void ZEScreen_Shader_SetUniformf2(ZEShaderProg *prog, const char *name, ZEVec2 param) {
+    glUseProgram(prog->prog);
+    GLint uSysTime = glGetUniformLocation(prog->prog, name);
+    glUniform2f(uSysTime, param.x, param.y);
+    glUseProgram(0);
+}
+
+void ZEScreen_Shader_SetUniformf3(ZEShaderProg *prog, const char *name, ZEVec3 param) {
+    glUseProgram(prog->prog);
+    GLint uSysTime = glGetUniformLocation(prog->prog, name);
+    glUniform3f(uSysTime, param.x, param.y, param.z);
+    glUseProgram(0);
+}
+
+void ZEScreen_Shader_SetUniformf4(ZEShaderProg *prog, const char *name, ZEVec4 param) {
+    glUseProgram(prog->prog);
+    GLint uSysTime = glGetUniformLocation(prog->prog, name);
+    glUniform4f(uSysTime, param.x, param.y, param.z, param.w);
+    glUseProgram(0);
+}
+
 static void _onresize(s32 w, s32 h) {
     if (w == 0 && h == 0) glfwGetWindowSize(rwin, &w, &h);
 
@@ -190,13 +325,103 @@ static void _onresize(s32 w, s32 h) {
     rheight = h;
 
     glViewport(0, 0, rwidth, rheight);
+
+    if (rrendfbo != -1) glDeleteFramebuffers(1, &rrendfbo);
+    if (rrendtex != -1) glDeleteTextures(1, &rrendtex);
+    if (rrenddtex != -1) glDeleteTextures(1, &rrenddtex);
+
+	glGenFramebuffers(1, &rrendfbo);
+
+	glGenTextures(1, &rrendtex);
+	glGenTextures(1, &rrenddtex);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, rrendfbo);
+
+	glBindTexture(GL_TEXTURE_2D, rrendtex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glBindTexture(GL_TEXTURE_2D, rrenddtex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(
+        GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0,
+        GL_DEPTH_COMPONENT, GL_FLOAT, NULL
+    );
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, rrenddtex, 0);
+
+	glBindTexture(GL_TEXTURE_2D, rrendtex);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, rrendtex, 0);
+
 }
 
 static void resize_callback(GLFWwindow *win, int w, int h) {
     _onresize(w, h);
 }
 
+typedef enum {
+    RTK_LINE      = 0,
+    RTK_TRI       = 1,
+    RTK_TRI_FANCY = 2,
+    RTK_TRIEX     = 3
+} RenderTaskKind;
+
+typedef struct {
+    RenderTaskKind kind;
+    ZEVec3 a, b, c;
+    ZEColor x1, x2, x3;
+    int do_render;
+} RenderTask;
+
+typedef struct {
+    RenderTask *items;
+    size_t count, capacity;
+} RenderTasks;
+
+typedef struct {
+    RenderTask *first;
+    size_t count;
+    int thread_id; // Shouldn't be changed after initialization
+    int locked;
+} RenderThreadArg;
+
+// TODO: Ensure that rendering will be performed on the same state as at moment of asking for.
+
+// Maximum supported amount of threads that game engine can use
+#define MAX_THREADS 64
+
+static RenderTasks rtks = {0};
+static pthread_t threads[MAX_THREADS] = {0};
+static RenderThreadArg tdata[MAX_THREADS] = {0};
+static pthread_mutex_t rtks_mutex[MAX_THREADS] = {0};
+static long thread_count;
+
+static void *render_thread(void *arg);
+
 void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title, u32 flags) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 2*1024);
+    thread_count = sysconf(_SC_NPROCESSORS_ONLN)>>1;
+    if (thread_count < 1) thread_count = 1;
+    //pthread_mutex_init(&rtks_wakeup_mutex, NULL);
+    //pthread_mutex_lock(&rtks_wakeup_mutex);
+    for (int i = 0; i < thread_count; ++i) {
+        //rtks_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
+        //rtks_complete_sig[i] = PTHREAD_COND_INITIALIZER;
+        pthread_mutex_init(&rtks_mutex[i], NULL);
+        pthread_mutex_lock(&rtks_mutex[i]);
+        tdata[i].thread_id = i;
+        pthread_create(&threads[i], &attr, render_thread, &tdata[i]);
+    }
     if (glfwInit() == 0) ZELog(ZELOG_FATAL, "GLFW: Failed to initialize GLFW");
 
     glfwDefaultWindowHints();
@@ -211,17 +436,24 @@ void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title, u32 flags)
     }
     if (flags & ZEScreenFlag_Resizeable) glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     else glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    if (flags & ZEScreenFlag_Borderless) ZELog(ZELOG_WARNING, "GLFW: Flag ZEScreenFlag_Borderless isn't avaliable on GLFW");
+    if (flags & ZEScreenFlag_Borderless) ZELog(ZELOG_WARNING, "GLFW: Flag ZEScreenFlag_Borderless isn't avaliable in GLFW");
     rwin = glfwCreateWindow(width, height, title, monitor, NULL);
     if (rwin == NULL) ZELog(ZELOG_FATAL, "GLFW: Failed to open a window");
-
-    _onresize(0, 0);
-
     glfwSetWindowSizeCallback(rwin, resize_callback);
     glfwSetKeyCallback(rwin, key_callback);
     glfwMakeContextCurrent(rwin);
+    gladLoadGL();
+    glfwSetInputMode(rwin, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    _onresize(0, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, rrendfbo);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glDepthFunc(GL_LESS);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
 }
 
@@ -257,25 +489,27 @@ void ZEScreen_BeginFrame(f64 *omx, f64 *omy) {
 
     ZEScreen_ResetCamera();
 
-    // It doesn't work on MS Windows.
     if (omx) *omx = 0;
     if (omy) *omy = 0;
-    // i32 mx_ = 0, my_ = 0;
-    // RGFW_window_getMouse(rwin, &mx_, &my_);
-    // {
-    //     f32 mx = mx_;
-    //     f32 my = my_;
-    //     mx -= rwidth*.5;
-    //     my -= rheight*.5;
-    //     mx /= rwidth*.5;
-    //     my /= rheight*.5;
-    //     if (omx) *omx = mx;
-    //     if (omy) *omy = my;
-    //     RGFW_window_moveMouse(rwin, rwin->x+rwidth*.5, rwin->y+rheight*.5);
-    // }
+    static f64 smx_ = 0, smy_ = 0;
+    f64 mx_ = 0, my_ = 0;
+    glfwGetCursorPos(rwin, &mx_, &my_);
+    {
+        f32 mx = mx_;
+        f32 my = my_;
+        mx -= rwidth*.5;
+        my -= rheight*.5;
+        mx /= rwidth*.5;
+        my /= rheight*.5;
+        if (omx) *omx = mx-smx_;
+        if (omy) *omy = my-smy_;
+        smx_ = mx;
+        smy_ = my;
+    }
 }
 
-static ZEVec3 rcampos = {0};
+static ZEVec3     rcampos = {0};
+static ZEGeomBBox rcambox = {0};
 
 void ZEScreen_ResetCamera() {
     glMatrixMode(GL_PROJECTION);
@@ -284,7 +518,7 @@ void ZEScreen_ResetCamera() {
     { // stolen from GLu.
         f32 m[4][4] = {0};
         f32 radians = rfov / 2 * PI / 180;
-        f32 zNear = .01, zFar = 100.;
+        f32 zNear = .01, zFar = 100000.;
         f32 deltaZ = zFar-zNear;
         f32 sine = sin(radians);
         f32 cotangent = cos(radians)/sine;
@@ -308,12 +542,17 @@ void ZEScreen_ResetCamera() {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     memset(&rcampos, 0, sizeof(rcampos));
+    memset(&rcambox, 0, sizeof(rcambox));
 }
+
+#define CUT_DST 4000
 
 void ZEScreen_TranslateCamera(ZEVec3 origin) {
     glMatrixMode(GL_PROJECTION);
     glTranslated(-origin.x, -origin.y, -origin.z);
     rcampos = origin;
+    rcambox.center = rcampos;
+    rcambox.dimensions = ZEVec3_From1(CUT_DST);
 }
 
 void ZEScreen_RotateCamera(f64 yaw, f64 pitch, f64 roll) {
@@ -323,9 +562,105 @@ void ZEScreen_RotateCamera(f64 yaw, f64 pitch, f64 roll) {
     glRotated(yaw*RAD2DEG, 0, 1, 0);
 }
 
+static f64 get_light(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEVec3 sun) {
+    f64 ax = b.x-a.x,     ay = b.y-a.y,     az = b.z-a.z;
+    f64 bx = c.x-a.x,     by = c.y-a.y,     bz = c.z-a.z;
+    f64 nx = ay*bz-az*by, ny = az*bx-ax*bz, nz = ax*by-ay*bx;
+    f64 nm = 1/sqrt(nx*nx+ny*ny+nz*nz);
+    nx *= nm; ny *= nm; nz *= nm;
+    f64 d = DOT3(nx, ny, nz, sun.x, sun.y, sun.z);
+    if (d < 0) d = 0;
+    d += .3f;
+    if (d > 1) d = 1;
+    return d;
+}
+
+static void *render_thread(void *arg) {
+    if (arg == NULL) return NULL;
+    RenderThreadArg *rta = arg;
+    for (;;) {
+        while (rta->locked == 1) {}
+        pthread_mutex_lock(&rtks_mutex[rta->thread_id]);
+        f64 t = ZE_getSystemTime();
+        ZEVec3 sun = ZEVec3_Norm(ZEVec3_From3(cos(ZEsystemTime), sin(ZEsystemTime), cos(ZEsystemTime/TAU*.01)));
+        // ZEVec3 sun = ZEVec3_Norm(ZEVec3_From3(1.,-1.,1.));
+        for (size_t i = 0; i < rta->count; ++i) {
+            RenderTask *task = &rta->first[i];
+            task->do_render = (ZEGeomIsPointInBBox(task->a, rcambox) || ZEGeomIsPointInBBox(task->b, rcambox) || ZEGeomIsPointInBBox(task->c, rcambox)) &&
+                              (ZEVec3_Dist(task->a, rcampos)<CUT_DST || ZEVec3_Dist(task->b, rcampos)<CUT_DST || ZEVec3_Dist(task->c, rcampos)<CUT_DST);
+            if (task->do_render && task->kind == RTK_TRI_FANCY) {
+                f64 light = get_light(task->a, task->b, task->c, sun);
+                task->x1 = ZEColor_scale(task->x1, light);
+                task->x2 = ZEColor_scale(task->x2, light);
+                task->x3 = ZEColor_scale(task->x3, light);
+            }
+        }
+        rta->locked = 1;
+        printf("All that nonsence took %2.8fs\n", ZE_getSystemTime()-t);
+        pthread_mutex_unlock(&rtks_mutex[rta->thread_id]);
+    }
+    return NULL;
+}
+
 void ZEScreen_EndFrame() {
-    glfwSwapBuffers(rwin);
+	glBindFramebuffer(GL_FRAMEBUFFER, rrendfbo);
+    glClearColor(0.f, 1.f, 1.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBegin(GL_TRIANGLES);
+    if (rtks.count > 0) {
+        for (int i = 0, ti = 0; i <= rtks.count; ++i) {
+            if (ti*thread_count/rtks.count != i*thread_count/rtks.count || i == rtks.count) {
+                int t = ti*thread_count/rtks.count;
+                tdata[t].first = &rtks.items[ti];
+                tdata[t].count = i-ti;
+                pthread_mutex_unlock(&rtks_mutex[t]);
+                ti = i;
+            }
+        }
+        for (int i = 0; i < thread_count; ++i) {
+            pthread_mutex_lock(&rtks_mutex[i]);
+            tdata[i].locked = 0;
+        }
+    }
+    int trc = 0;
+    da_foreach(&rtks, RenderTask, task) {
+        if (!task->do_render) {
+            continue;
+        }
+        trc++;
+        switch (task->kind) {
+        case RTK_TRI:
+            glColor4d(task->x1.r, task->x1.g, task->x1.b, task->x1.a);
+            glVertex3d(task->a.x, task->a.y, task->a.z);
+            glVertex3d(task->b.x, task->b.y, task->b.z);
+            glVertex3d(task->c.x, task->c.y, task->c.z);
+            break;
+        case RTK_TRI_FANCY:
+            glColor4d(task->x1.r, task->x1.g, task->x1.b, task->x1.a);
+            glVertex3d(task->a.x, task->a.y, task->a.z);
+            glColor4d(task->x2.r, task->x2.g, task->x2.b, task->x2.a);
+            glVertex3d(task->b.x, task->b.y, task->b.z);
+            glColor4d(task->x3.r, task->x3.g, task->x3.b, task->x3.a);
+            glVertex3d(task->c.x, task->c.y, task->c.z);
+            break;
+        case RTK_TRIEX:
+            glColor4d(task->x1.r, task->x1.g, task->x1.b, task->x1.a);
+            glVertex3d(task->a.x, task->a.y, task->a.z);
+            glColor4d(task->x2.r, task->x2.g, task->x2.b, task->x2.a);
+            glVertex3d(task->b.x, task->b.y, task->b.z);
+            glColor4d(task->x3.r, task->x3.g, task->x3.b, task->x3.a);
+            glVertex3d(task->c.x, task->c.y, task->c.z);
+            break;
+        default:
+            assert(0 && "Unreachable");
+        }
+    }
+    // printf("We have %d real triangles\n", trc);
+    glEnd();
+    rtks.count = 0;
     glFlush();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glfwSwapBuffers(rwin);
 }
 
 void ZEScreen_DrawCircle(ZEVec3 o, f64 r, ZEColor col) {
@@ -351,59 +686,43 @@ void ZEScreen_DrawCircle(ZEVec3 o, f64 r, ZEColor col) {
     glEnd();
 }
 
-#define CUT_DST 450
-
 void ZEScreen_DrawTriangleRaw(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
-    if (abs(a.x-rcampos.x)+abs(a.y-rcampos.y)+abs(a.z-rcampos.z) >= CUT_DST &&
-        abs(b.x-rcampos.x)+abs(b.y-rcampos.y)+abs(b.z-rcampos.z) >= CUT_DST &&
-        abs(c.x-rcampos.x)+abs(c.y-rcampos.y)+abs(c.z-rcampos.z) >= CUT_DST) return;
-    glBegin(GL_TRIANGLES);
-    glColor4d(col.r, col.g, col.b, col.a);
-    glVertex3d(a.x, a.y, a.z);
-    glVertex3d(b.x, b.y, b.z);
-    glVertex3d(c.x, c.y, c.z);
-    glEnd();
-}
-
-static f64 get_light(ZEVec3 a, ZEVec3 b, ZEVec3 c) {
-    f64 ax = b.x-a.x,     ay = b.y-a.y,     az = b.z-a.z;
-    f64 bx = c.x-a.x,     by = c.y-a.y,     bz = c.z-a.z;
-    f64 nx = ay*bz-az*by, ny = az*bx-ax*bz, nz = ax*by-ay*bx;
-    f64 nm = 1/sqrt(nx*nx+ny*ny+nz*nz);
-    nx *= nm; ny *= nm; nz *= nm;
-    f64 d = DOT3(nx, ny, nz, 0.07053, 0.21821, 0.70534);
-    if (d < 0) d = 0;
-    d += .3f;
-    if (d > 1) d = 1;
-    return d;
+    RenderTask task;
+    task.kind = RTK_TRI;
+    task.a = a;
+    task.b = b;
+    task.c = c;
+    task.x1 = col;
+    task.x2 = col;
+    task.x3 = col;
+    task.do_render = false;
+    da_append(&rtks, task);
 }
 
 void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
-    if (abs(a.x-rcampos.x)+abs(a.y-rcampos.y)+abs(a.z-rcampos.z) >= CUT_DST &&
-        abs(b.x-rcampos.x)+abs(b.y-rcampos.y)+abs(b.z-rcampos.z) >= CUT_DST &&
-        abs(c.x-rcampos.x)+abs(c.y-rcampos.y)+abs(c.z-rcampos.z) >= CUT_DST) return;
-    f64 d = get_light(a, b, c);
-    glBegin(GL_TRIANGLES);
-    glColor4d(col.r*d, col.g*d, col.b*d, col.a);
-    glVertex3d(a.x, a.y, a.z);
-    glVertex3d(b.x, b.y, b.z);
-    glVertex3d(c.x, c.y, c.z);
-    glEnd();
+    RenderTask task;
+    task.kind = RTK_TRI_FANCY;
+    task.a = a;
+    task.b = b;
+    task.c = c;
+    task.x1 = col;
+    task.x2 = col;
+    task.x3 = col;
+    task.do_render = false;
+    da_append(&rtks, task);
 }
 
 void ZEScreen_DrawTriangle_Ex(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor a_c, ZEColor b_c, ZEColor c_c) {
-    if (abs(a.x-rcampos.x)+abs(a.y-rcampos.y)+abs(a.z-rcampos.z) >= CUT_DST &&
-        abs(b.x-rcampos.x)+abs(b.y-rcampos.y)+abs(b.z-rcampos.z) >= CUT_DST &&
-        abs(c.x-rcampos.x)+abs(c.y-rcampos.y)+abs(c.z-rcampos.z) >= CUT_DST) return;
-    f64 d = get_light(a, b, c);
-    glBegin(GL_TRIANGLES);
-    glColor4d(a_c.r*d, a_c.g*d, a_c.b*d, a_c.a);
-    glVertex3d(a.x, a.y, a.z);
-    glColor4d(b_c.r*d, b_c.g*d, b_c.b*d, b_c.a);
-    glVertex3d(b.x, b.y, b.z);
-    glColor4d(c_c.r*d, c_c.g*d, c_c.b*d, c_c.a);
-    glVertex3d(c.x, c.y, c.z);
-    glEnd();
+    RenderTask task;
+    task.kind = RTK_TRIEX;
+    task.a = a;
+    task.b = b;
+    task.c = c;
+    task.x1 = a_c;
+    task.x2 = b_c;
+    task.x3 = c_c;
+    task.do_render = false;
+    da_append(&rtks, task);
 }
 
 bool ZEScreen_IsKeyPressed(ZEKey key) {

@@ -10,22 +10,25 @@ static f64 hash2(f64 x, f64 y) // Stolen from https://github.com/mattdesl/glsl-r
     return fmodf(sin(sn) * c, 1.);
 }
 
-void *terrain_alloc(ZEEnt_ent id) {
-    Terrain_Data *d = malloc(sizeof(Terrain_Data));
+void *terrain_alloc(ZEEnt_ent id, void *_Nullable arg) {
+    Terrain_Data *d = calloc(1, sizeof(Terrain_Data));
+    if (arg) {
+        Terrain_InitArg *_arg = arg;
+        d->x = _arg->x;
+        d->y = _arg->y;
+        d->z = _arg->z;
+    }
     int seed = time(NULL);
     for (int i = 0; i < TERSIZ; ++i) {
         for (int j = 0; j < TERSIZ; ++j) {
             f64 x = ((f64)(i%(TERSIZ/4)))/TERSIZ+seed;
             f64 y = ((f64)(j%(TERSIZ/4)))/TERSIZ+seed;
+
             f64 n = 0;
-            n += hash2(x, y)/2.;
-            n += hash2(x-fmod(1./32.,x), y-fmod(1./32.,y))/4.;
-            n += hash2(x-fmod(1./16.,x), y-fmod(1./16.,y))/8.;
-            n += hash2(x-fmod(1./8.,x),  y-fmod(1./8.,y))/16.;
-            n += hash2(x-fmod(1./4.,x),  y-fmod(1./4.,y))/32.;
-            n += hash2(x-fmod(1./2.,x),  y-fmod(1./2.,y))/64.;
-            
-            n += pow(hash2(x+5623, y+6931), 2);
+            n += hash2(x+d->x, y+d->z)*4.;
+            n += hash2(x-fmod(1./32.,x)+d->x, y-fmod(1./32.,y)+d->z);
+            n += hash2(x-fmod(1./16.,x)+d->x, y-fmod(1./16.,y)+d->z);
+
             d->terrain[j][i] = n*4.;
         }
     }
@@ -44,20 +47,17 @@ void terrain_onmsg(void *_ent, ZEEnt_ent ent_id, ZEEnt_ent caller, ZEEnt_Msg_Kin
                 const f64 h = (ent->terrain[j-1][i]+ent->terrain[j][i-1]+ent->terrain[j-1][i-1]+ent->terrain[j][i])*.25;
                 const ZEColor c = (h > 3) ? ZEWHITE : ZEBEIGE;
                 ZEScreen_DrawTriangle(
-                    ZEVec3_From3(x*f, ent->terrain[j][i],   (y*f)),
-                    ZEVec3_From3((x-1)*f, ent->terrain[j][i-1], (y*f)),
-                    ZEVec3_From3(x*f, ent->terrain[j-1][i], (y-1)*f),
+                    ZEVec3_From3(x*f    +ent->x,  ent->terrain[j][i]   +ent->y, (y*f)  +ent->z),
+                    ZEVec3_From3((x-1)*f+ent->x,  ent->terrain[j][i-1] +ent->y, (y*f)  +ent->z),
+                    ZEVec3_From3(x*f    +ent->x,  ent->terrain[j-1][i] +ent->y, (y-1)*f+ent->z),
                     c);
                 ZEScreen_DrawTriangle(
-                    ZEVec3_From3((x-1)*f, ent->terrain[j-1][i-1], (y-1)*f),
-                    ZEVec3_From3((x-1)*f, ent->terrain[j][i-1],   (y*f)),
-                    ZEVec3_From3(x*f, ent->terrain[j-1][i],   (y-1)*f),
+                    ZEVec3_From3(x*f    +ent->x, ent->terrain[j-1][i]  +ent->y, (y-1)*f+ent->z),
+                    ZEVec3_From3((x-1)*f+ent->x, ent->terrain[j][i-1]  +ent->y, (y*f)  +ent->z),
+                    ZEVec3_From3((x-1)*f+ent->x, ent->terrain[j-1][i-1]+ent->y, (y-1)*f+ent->z),
                     c);
             }
         }
-    } break;
-    case ZEENT_MSG_USR1: {
-        *((Terrain_Data **)msg_data) = ent;
     } break;
     }
 }

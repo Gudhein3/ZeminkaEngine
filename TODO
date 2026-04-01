@@ -11,3 +11,5 @@ Add console system.
 Add orthographic projection support.
 Improve the camera system.
 Make the executables reproducible. [https://reproducible-builds.org/docs/randomness/] -frandom-seed
+Fix the flickering problem.
+Add settings.

@@ -11,7 +11,7 @@
 
 #include <time.h>
 
-static double getSystemTime() { // TODO: Make it public.
+double ZE_getSystemTime() {
 #if defined(_WIN32)
     FILETIME system_time;
     ULARGE_INTEGER large;
@@ -40,7 +40,7 @@ static u64 getUnxTime() { // Un*x is a forbidden word.
 static double getDeltaTime() {
     static double latest = 0;
     double platest = latest;
-    latest = getSystemTime();
+    latest = ZE_getSystemTime();
     if (latest == 0)
         return 0;
     return latest-platest;
@@ -128,12 +128,13 @@ int main(int argc, char **argv) {
 
     while (ZEScreen_IsNtClosed()) {
         ZEdeltaTime = getDeltaTime();
-        ZEsystemTime = getSystemTime();
+        ZEsystemTime = ZE_getSystemTime();
         ZEScreen_BeginFrame(&ZEmousedX, &ZEmousedY);
         Game_update();
         ZEEnt_update();
         Game_post_update();
         ZEScreen_EndFrame();
+        printf("Delay: %2.8f; FPS: %3.3f\n", ZEdeltaTime, 1./ZEdeltaTime);
     }
 }
 
@@ -190,23 +191,28 @@ ZETransformW ZETransform_Cache(ZETransform t) {
     return (ZETransformW) {
         t.position,
         t.scale,
-        ZERotation_From_Rad(t.rotation.z),
-        ZERotation_From_Rad(t.rotation.y),
-        ZERotation_From_Rad(t.rotation.x),
+        cos(t.rotation.x),
+        cos(t.rotation.y),
+        cos(t.rotation.z),
+        sin(t.rotation.x),
+        sin(t.rotation.y),
+        sin(t.rotation.z),
     };
 }
 
 ZEVec3 ZETransformW_Apply(ZETransformW t, ZEVec3 v) {
     // RST
-    v = ZEVec3_RotateYZ(v, t.cryz);
-    v = ZEVec3_RotateXZ(v, t.crxz);
-    v = ZEVec3_RotateXY(v, t.crxy);
-
-    v = ZEVec3_Mul(v, t.scale);
-
-    v = ZEVec3_Add(v, t.position);
-
-    return v;
+    ZEVec3 nv;
+    nv.x =  v.x*t.cry*t.crz;
+    nv.x += v.y*(-t.crx*t.srz+t.srx*t.sry*t.crz);
+    nv.x += v.z*(t.srx*t.srz+t.crx*t.sry*t.crz);
+    nv.y =  v.x*t.cry*t.crz;
+    nv.y += v.y*(t.crx*t.crz+t.srx*t.sry*t.srz);
+    nv.y += v.z*(-t.srx*t.crz+t.crx*t.sry*t.srz);
+    nv.z =  v.x*-t.sry;
+    nv.z += v.y*t.srx*t.cry;
+    nv.z += v.z*t.crx*t.cry;
+    return nv;
 }
 
 void ZELog(ZELogLevel ll, const char *fmt, ...) {
@@ -234,7 +240,6 @@ void ZELog(ZELogLevel ll, const char *fmt, ...) {
     va_end(list1);
 
     if (ll == ZELOG_FATAL) {
-        // The OS will close file when the program close so, no `fclose(_logf);'.
-        exit(1);
+        abort();
     }
 }

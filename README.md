@@ -1,5 +1,4 @@
-# Kolya142's new game engine Zeminka
+# Zeminka Engine
 
 ## Mainteiners
-[Kolya142](https://github.com/Kolya142) - Engine main developer \
-[crimbrodev](https://github.com/crimbrodev) - IDE main developer
+[Gudhein3](https://codeberg.org/Gudhein3) - Engine main developer

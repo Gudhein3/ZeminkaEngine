@@ -1,5 +1,6 @@
 #pragma once
 #include <stdbool.h>
+#include <assert.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -11,9 +12,26 @@
 #define __STR(x) __STR0(x)
 #endif
 
+#ifndef MULTILINE_STRING
+#define MULTILINE_STRING(...) #__VA_ARGS__
+#endif
+
 // Major - when backward compatibility is broken
 // Minor - when forward compatibility is broken
 // Patch - when neither backward compatibility nor forward compatibility is broken
+
+#define da_append(xs, x)                                                             \
+    do {                                                                             \
+        if ((xs)->count >= (xs)->capacity) {                                         \
+            if ((xs)->capacity == 0) (xs)->capacity = 256;                           \
+            else (xs)->capacity *= 2;                                                \
+            (xs)->items = realloc((xs)->items, (xs)->capacity*sizeof(*(xs)->items)); \
+        }                                                                            \
+                                                                                     \
+        (xs)->items[(xs)->count++] = (x);                                            \
+    } while (0)
+
+#define da_foreach(xs, t, it) for (t *it = (xs)->items; it < (xs)->items+(xs)->count; ++it)
 
 #define ZEMINKAENG_VER_MAJOR 1
 #define ZEMINKAENG_VER_MINOR 0
@@ -73,6 +91,18 @@ typedef struct {
     r, g, b, a;
 } ZEColor;
 
+static inline ZEColor ZEColor_scale(ZEColor c, f64 f) {return (ZEColor) {c.r*f, c.g*f, c.b*f, c.a};}
+
+#define ZEVec3_north ((ZEVec3) {0, 0, 1})
+#define ZEVec3_south ((ZEVec3) {0, 0, -1})
+#define ZEVec3_west  ((ZEVec3) {-1, 0, 0})
+#define ZEVec3_east  ((ZEVec3) {1, 0, 0})
+
+#define ZEVec2_north ((ZEVec2) {0, 1})
+#define ZEVec2_south ((ZEVec2) {0, -1})
+#define ZEVec2_west  ((ZEVec2) {-1, 0})
+#define ZEVec2_east  ((ZEVec2) {1, 0})
+
 typedef struct {
     const ZEVertex *verteces;
     const ZEColor *colors; // 1 color per vertex.
@@ -87,7 +117,8 @@ typedef struct {
 
 typedef struct {
     ZEVec3 position, scale;
-    ZERotation crxy, crxz, cryz;
+    f64 crx, cry, crz;
+    f64 srx, sry, srz;
 } ZETransformW; // Cached version of ZETransform. Shouldn't be modified if you doesn't understood what it does.
 
 static inline ZEVec2 ZEVec2_From1(f64 x) {return (ZEVec2){x,x};}
@@ -105,6 +136,9 @@ static inline ZEVec4 ZEVec4_From4(f64 x, f64 y, f64 z, f64 w) {return (ZEVec4){x
 static inline ZERotation ZERotation_From_Rad(f64 a) {
     return (ZERotation) {cos(a), sin(a)};
 }
+
+double ZE_getSystemTime();
+
 ZEVec2 ZEVec2_Rotate(ZEVec2 v, ZERotation r);
 ZEVec3 ZEVec3_RotateXY(ZEVec3 v, ZERotation r);
 ZEVec3 ZEVec3_RotateYZ(ZEVec3 v, ZERotation r);

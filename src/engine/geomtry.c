@@ -1,5 +1,11 @@
 #include <zeminka/engine.h>
 
+bool ZEGeomIsPointInBBox(ZEVec3 p, ZEGeomBBox b) {
+    return (p.x >= b.center.x - b.dimensions.x && p.x <= b.center.x + b.dimensions.x &&
+            p.y >= b.center.y - b.dimensions.y && p.y <= b.center.y + b.dimensions.y &&
+            p.z >= b.center.z - b.dimensions.z && p.z <= b.center.z + b.dimensions.z);
+}
+
 // Thanks Aitor Lopera Toledo for https://github.com/atlotl/CubeIntersectionCalculator.
 bool ZEGeomAreBBoxIntersecting(ZEGeomBBox a, ZEGeomBBox b) {
     return !(a.center.x + a.dimensions.x / 2 < b.center.x - b.dimensions.x / 2 ||

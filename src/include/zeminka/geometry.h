@@ -7,5 +7,6 @@ typedef struct {
     ZEVec3 center, dimensions;
 } ZEGeomBBox;
 
+bool ZEGeomIsPointInBBox(ZEVec3 p, ZEGeomBBox b);
 bool ZEGeomAreBBoxIntersecting(ZEGeomBBox a, ZEGeomBBox b);
 // TODO: convex collision https://github.com/lukesrw/separating-axis-theorem
