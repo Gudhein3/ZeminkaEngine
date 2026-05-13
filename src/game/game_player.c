@@ -56,17 +56,17 @@ void player_onmsg(void *_ent, ZEEnt_ent ent_id, ZEEnt_ent caller, ZEEnt_Msg_Kind
             }
         }
         printf("We have %d pieces of terrain\n", tc);
-        // for (int i = 0; i < 9; ++i) {
-        //     for (int j = 0; j < 9; ++j) {
-        //         if (mapped[j][i] == 0) {
-        //             Terrain_InitArg terrain;
-        //             terrain.x = x+(i-4)*gap;
-        //             terrain.y = 0;
-        //             terrain.z = z+(j-4)*gap;
-        //             ZEEnt_add(INTF_TERRAIN, &terrain);
-        //         }
-        //     }
-        // }
+        for (int i = 0; i < 9; ++i) {
+            for (int j = 0; j < 9; ++j) {
+                if (mapped[j][i] == 0) {
+                    Terrain_InitArg terrain;
+                    terrain.x = x+(i-4)*gap;
+                    terrain.y = 0;
+                    terrain.z = z+(j-4)*gap;
+                    ZEEnt_add(INTF_TERRAIN, &terrain);
+                }
+            }
+        }
         // TBD: full 3-component rotation.
         // if (ZEScreen_IsKeyDown(ZEKEY_Left)) ent->c_roll += ZEdeltaTime;
         // if (ZEScreen_IsKeyDown(ZEKEY_Right)) ent->c_roll -= ZEdeltaTime;

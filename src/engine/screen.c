@@ -393,7 +393,7 @@ typedef struct {
     int locked;
 } RenderThreadArg;
 
-// TODO: Ensure that rendering will be performed on the same state as at moment of asking for.
+// TODO: Ensure that rendering will be performed on the same state as at moment of requiring.
 
 // Maximum supported amount of threads that game engine can use
 #define MAX_THREADS 64
@@ -406,12 +406,18 @@ static long thread_count;
 
 static void *render_thread(void *arg);
 
+static void get_thread_cnt() {
+    thread_count = sysconf(_SC_NPROCESSORS_ONLN);
+    if (thread_count >= MAX_THREADS) thread_count = MAX_THREADS;
+    else if (thread_count >= 8) thread_count--; // Giving a thread to others.
+    else if (thread_count >= 1) /*thread_count = thread_count*/;
+}
+
 void ZEScreen_init(u32 width, u32 height, f64 fov, const char *title, u32 flags) {
     pthread_attr_t attr;
     pthread_attr_init(&attr);
-    pthread_attr_setstacksize(&attr, 2*1024);
-    thread_count = sysconf(_SC_NPROCESSORS_ONLN)>>1;
-    if (thread_count < 1) thread_count = 1;
+    pthread_attr_setstacksize(&attr, 512);
+    get_thread_cnt();
     //pthread_mutex_init(&rtks_wakeup_mutex, NULL);
     //pthread_mutex_lock(&rtks_wakeup_mutex);
     for (int i = 0; i < thread_count; ++i) {
@@ -545,7 +551,7 @@ void ZEScreen_ResetCamera() {
     memset(&rcambox, 0, sizeof(rcambox));
 }
 
-#define CUT_DST 4000
+#define CUT_DST 1000
 
 void ZEScreen_TranslateCamera(ZEVec3 origin) {
     glMatrixMode(GL_PROJECTION);
@@ -582,7 +588,8 @@ static void *render_thread(void *arg) {
         while (rta->locked == 1) {}
         pthread_mutex_lock(&rtks_mutex[rta->thread_id]);
         f64 t = ZE_getSystemTime();
-        ZEVec3 sun = ZEVec3_Norm(ZEVec3_From3(cos(ZEsystemTime), sin(ZEsystemTime), cos(ZEsystemTime/TAU*.01)));
+        const f64 sp = 1/60;
+        ZEVec3 sun = ZEVec3_Norm(ZEVec3_From3(cos(ZEsystemTime*sp), sin(ZEsystemTime*sp), cos(ZEsystemTime/TAU*.01*sp)));
         // ZEVec3 sun = ZEVec3_Norm(ZEVec3_From3(1.,-1.,1.));
         for (size_t i = 0; i < rta->count; ++i) {
             RenderTask *task = &rta->first[i];
@@ -596,7 +603,7 @@ static void *render_thread(void *arg) {
             }
         }
         rta->locked = 1;
-        printf("All that nonsence took %2.8fs\n", ZE_getSystemTime()-t);
+        printf("Imta %dth renderer; All that nonsence took %2.8fs\n", rta->thread_id, ZE_getSystemTime()-t);
         pthread_mutex_unlock(&rtks_mutex[rta->thread_id]);
     }
     return NULL;
@@ -655,7 +662,7 @@ void ZEScreen_EndFrame() {
             assert(0 && "Unreachable");
         }
     }
-    // printf("We have %d real triangles\n", trc);
+    printf("We have %d real triangles\n", trc);
     glEnd();
     rtks.count = 0;
     glFlush();
@@ -687,6 +694,7 @@ void ZEScreen_DrawCircle(ZEVec3 o, f64 r, ZEColor col) {
 }
 
 void ZEScreen_DrawTriangleRaw(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
+    if (!ZEGeomIsPointInBBox(a, rcambox) || !ZEGeomIsPointInBBox(b, rcambox) || !ZEGeomIsPointInBBox(c, rcambox)) return;
     RenderTask task;
     task.kind = RTK_TRI;
     task.a = a;
@@ -700,6 +708,7 @@ void ZEScreen_DrawTriangleRaw(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
 }
 
 void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
+    if (!ZEGeomIsPointInBBox(a, rcambox) || !ZEGeomIsPointInBBox(b, rcambox) || !ZEGeomIsPointInBBox(c, rcambox)) return;
     RenderTask task;
     task.kind = RTK_TRI_FANCY;
     task.a = a;
@@ -713,6 +722,7 @@ void ZEScreen_DrawTriangle(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor col) {
 }
 
 void ZEScreen_DrawTriangle_Ex(ZEVec3 a, ZEVec3 b, ZEVec3 c, ZEColor a_c, ZEColor b_c, ZEColor c_c) {
+    if (!ZEGeomIsPointInBBox(a, rcambox) || !ZEGeomIsPointInBBox(b, rcambox) || !ZEGeomIsPointInBBox(c, rcambox)) return;
     RenderTask task;
     task.kind = RTK_TRIEX;
     task.a = a;
